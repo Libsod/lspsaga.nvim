@@ -282,15 +282,18 @@ function hover:open_floating_preview(content, option_fn)
   end
 
 
+  -- *** ИЗМЕНЕНИЕ: Мы больше НЕ фильтруем ``` из финального контента ***
+  local new_content_for_display = vim.deepcopy(content)
+
   if option_fn then
     float_option = vim.tbl_extend('keep', float_option, option_fn(float_option.width))
   end
 
-  local curbuf = api.nvim_get_current_buf()
+  local curbuf_for_autocmds = api.nvim_get_current_buf()
 
   self.bufnr, self.winid = win
     :new_float(float_option, false, option_fn and true or false)
-    :setlines(new)
+    :setlines(new_content_for_display) -- Передаем ПОЛНЫЙ контент с ```
     :bufopt({
       ['filetype'] = 'markdown',
       ['modifiable'] = false,
@@ -298,8 +301,9 @@ function hover:open_floating_preview(content, option_fn)
       ['bufhidden'] = 'wipe',
     })
     :winopt({
-      ['conceallevel'] = 2,
-      ['concealcursor'] = 'niv',
+      -- *** ИЗМЕНЕНИЕ: Включаем conceal, чтобы скрыть ``` ***
+      ['conceallevel'] = 2, -- 2 или 3 для активного скрытия
+      ['concealcursor'] = 'n', -- Скрывать и под курсором в нормальном режиме
       ['showbreak'] = 'NONE',
       ['wrap'] = true,
     })
@@ -310,7 +314,8 @@ function hover:open_floating_preview(content, option_fn)
     api.nvim_buf_add_highlight(self.bufnr, 0, 'Type', tuncate_lnum - 1, 0, -1)
   end
 
-  vim.treesitter.start(self.bufnr, 'markdown')
+  -- *** ИЗМЕНЕНИЕ: Безопасно активируем Tree-sitter для финального окна ***
+  pcall(vim.treesitter.start, self.bufnr, 'markdown')
   vim.treesitter.query.set(
     'markdown',
     'highlights',
@@ -323,11 +328,11 @@ function hover:open_floating_preview(content, option_fn)
     ]]
   )
 
-  util.scroll_in_float(curbuf, self.winid)
+  util.scroll_in_float(curbuf_for_autocmds, self.winid)
   api.nvim_create_autocmd('WinClosed', {
     buffer = self.bufnr,
     callback = function()
-      util.delete_scroll_map(curbuf)
+      util.delete_scroll_map(curbuf_for_autocmds)
     end,
   })
 
@@ -340,11 +345,11 @@ function hover:open_floating_preview(content, option_fn)
 
   if not option_fn then
     api.nvim_create_autocmd({ 'CursorMoved', 'InsertEnter', 'BufDelete' }, {
-      buffer = curbuf,
+      buffer = curbuf_for_autocmds,
       once = true,
       callback = function(opt)
         if self.bufnr and api.nvim_buf_is_loaded(self.bufnr) then
-          util.delete_scroll_map(curbuf)
+          util.delete_scroll_map(curbuf_for_autocmds)
         end
 
         if self.winid and api.nvim_win_is_valid(self.winid) then
@@ -374,7 +379,7 @@ function hover:open_floating_preview(content, option_fn)
   api.nvim_create_autocmd('BufWipeout', {
     buffer = self.bufnr,
     callback = function()
-      pcall(util.delete_scroll_map, curbuf)
+      pcall(util.delete_scroll_map, curbuf_for_autocmds)
     end,
   })
 end
