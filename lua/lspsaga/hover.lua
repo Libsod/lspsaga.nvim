@@ -55,7 +55,7 @@ function hover:open_link()
 end
 
 function hover:open_floating_preview(content, option_fn)
-  -- Агрессивная очистка состояния предыдущего ховера
+  -- "Агрессивная очистка" состояния предыдущего ховера
   if self.winid and api.nvim_win_is_valid(self.winid) then
     pcall(api.nvim_win_close, self.winid, true)
   end
@@ -228,60 +228,6 @@ function hover:open_floating_preview(content, option_fn)
     zindex = 80,
   }
 
-  local new = {}
-
-  local in_codeblock = false
-
-  for _, line in ipairs(content) do
-    if line:find('\\') then
-      line = line:gsub('\\(?![tn])', '')
-    end
-    if line:find('%[%w+%][^%(]') and not in_codeblock then
-      line = line:gsub('%[', '%[%[')
-      line = line:gsub('%]', '%]%]')
-    end
-    if line:find('\r') then
-      line = line:gsub('\r\n?', ' ')
-    end
-    if line:find('&nbsp;') then
-      line = line:gsub('&nbsp;', ' ')
-    end
-    if line:find('&lt;') then
-      line = line:gsub('&lt;', '<')
-    end
-    if line:find('&gt;') then
-      line = line:gsub('&gt;', '>')
-    end
-    if line:find('<pre>') then
-      line = line:gsub('<pre>', '```')
-      in_codeblock = true
-    end
-    if line:find('</pre>') then
-      line = line:gsub('</pre>', '```')
-      in_codeblock = false
-    end
-    if line:find('```') then
-      in_codeblock = in_codeblock and false or true
-    end
-    if line:find('^%-%-%-$') then
-      line = util.gen_truncate_line(float_option.width)
-    end
-    if line:find('\\') then
-      line = line:gsub('\\', '')
-    end
-    if #line > 0 then
-      new[#new + 1] = line
-    end
-  end
-
-  local tuncate_lnum = -1
-  for i, line in ipairs(new) do
-    if line:find('^─') then
-      tuncate_lnum = i
-    end
-  end
-
-
   -- *** ИЗМЕНЕНИЕ: Мы больше НЕ фильтруем ``` из финального контента ***
   local new_content_for_display = vim.deepcopy(content)
 
@@ -310,24 +256,10 @@ function hover:open_floating_preview(content, option_fn)
     :winhl('HoverNormal', 'HoverBorder')
     :wininfo()
 
-  if tuncate_lnum > 0 then
-    api.nvim_buf_add_highlight(self.bufnr, 0, 'Type', tuncate_lnum - 1, 0, -1)
-  end
-
   -- *** ИЗМЕНЕНИЕ: Безопасно активируем Tree-sitter для финального окна ***
   pcall(vim.treesitter.start, self.bufnr, 'markdown')
-  vim.treesitter.query.set(
-    'markdown',
-    'highlights',
-    [[
-      ([
-        (info_string)
-        (fenced_code_block_delimiter)
-      ] @conceal
-      (#set! conceal ""))
-    ]]
-  )
 
+  -- Остальная часть функции lspsaga (scroll, autocmds, keymaps) ...
   util.scroll_in_float(curbuf_for_autocmds, self.winid)
   api.nvim_create_autocmd('WinClosed', {
     buffer = self.bufnr,
@@ -351,7 +283,6 @@ function hover:open_floating_preview(content, option_fn)
         if self.bufnr and api.nvim_buf_is_loaded(self.bufnr) then
           util.delete_scroll_map(curbuf_for_autocmds)
         end
-
         if self.winid and api.nvim_win_is_valid(self.winid) then
           api.nvim_win_close(self.winid, true)
         end
@@ -360,7 +291,6 @@ function hover:open_floating_preview(content, option_fn)
       end,
       desc = '[Lspsaga] Auto close hover window',
     })
-
     api.nvim_create_autocmd('BufEnter', {
       callback = function(opt)
         if opt.buf ~= self.bufnr and self.winid and api.nvim_win_is_valid(self.winid) then

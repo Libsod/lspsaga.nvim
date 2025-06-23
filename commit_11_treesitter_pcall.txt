@@ -1,8 +1,0 @@
-Для коммита 11 (fix(hover): use pcall when enabling treesitter for markdown):
-
-Заменить:
-  vim.treesitter.start(self.bufnr, 'markdown')
-
-на:
-  -- *** ИЗМЕНЕНИЕ: Безопасно активируем Tree-sitter для финального окна ***
-  pcall(vim.treesitter.start, self.bufnr, 'markdown')

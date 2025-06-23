@@ -1,9 +1,0 @@
-Для коммита 10 (refactor(hover): rename curbuf variable to curbuf_for_autocmds for clarity):
-
-Заменить все вхождения:
-  local curbuf = api.nvim_get_current_buf()
-
-на:
-  local curbuf_for_autocmds = api.nvim_get_current_buf()
-
-И заменить все вхождения curbuf на curbuf_for_autocmds

@@ -1,7 +1,0 @@
-Для коммита 9 (fix(hover): improve error handling in autocmd callbacks):
-
-Заменить:
-        api.nvim_del_autocmd(opt.id)
-
-на:
-        pcall(api.nvim_del_autocmd, opt.id)
