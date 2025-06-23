@@ -55,6 +55,20 @@ function hover:open_link()
 end
 
 function hover:open_floating_preview(content, option_fn)
+  -- Агрессивная очистка состояния предыдущего ховера
+  if self.winid and api.nvim_win_is_valid(self.winid) then
+    pcall(api.nvim_win_close, self.winid, true)
+  end
+  if self.bufnr and api.nvim_buf_is_valid(self.bufnr) then
+    pcall(api.nvim_buf_delete, self.bufnr, { force = true })
+  end
+  self.winid = nil
+  self.bufnr = nil
+  if self.cancel then
+    self.cancel()
+    self.cancel = nil
+  end
+
   local new = {}
   local max_float_width = math.floor(vim.o.columns * config.hover.max_width)
   local max_content_len = util.get_max_content_length(content)
