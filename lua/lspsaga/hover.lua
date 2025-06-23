@@ -69,13 +69,60 @@ function hover:open_floating_preview(content, option_fn)
     self.cancel = nil
   end
 
+  -- 1. Готовим content_for_calc (основной текст ховера без нашего блока "Links:")
+  local content_for_calc = {}
+  local in_main_content_for_calc_loop = true
+  for i, line in ipairs(content) do
+    if in_main_content_for_calc_loop then
+      local is_our_separator_start = false
+      if string.match(line, '^%s*---%s*$') then
+        if content[i + 1] and string.match(content[i + 1], '^%s*Links:%s*$') then
+          is_our_separator_start = true
+        end
+      end
+      if is_our_separator_start then
+        in_main_content_for_calc_loop = false
+      else
+        table.insert(content_for_calc, line)
+      end
+    end
+  end
+
+  -- 2. Расчет Идеальной Ширины
+  local conf_max_width_factor = config.hover.max_width or 0.8
+  local max_allowed_width_config = math.floor(vim.o.columns * conf_max_width_factor)
+  local lines_for_width_calc_filter = vim.tbl_filter(function(line_text)
+    return not string.match(line_text, '^%s*```') and not string.match(line_text, '^%s*$')
+  end, content_for_calc)
+  local ideal_width = 0
+  if #lines_for_width_calc_filter > 0 then
+    for _, line_to_measure in ipairs(lines_for_width_calc_filter) do
+      local current_line_contribution = vim.fn.strdisplaywidth(line_to_measure or '')
+      if current_line_contribution > 0 then
+        if current_line_contribution < max_allowed_width_config then
+          if current_line_contribution > ideal_width then
+            ideal_width = current_line_contribution
+          end
+        elseif ideal_width == 0 then
+          ideal_width = max_allowed_width_config
+        end
+      end
+    end
+    if ideal_width == 0 then
+      ideal_width = math.floor(max_allowed_width_config * 0.75)
+    end
+  else
+    ideal_width = math.floor(max_allowed_width_config * 0.5)
+  end
+  if ideal_width <= 0 then
+    ideal_width = 10
+  end
+
   local new = {}
-  local max_float_width = math.floor(vim.o.columns * config.hover.max_width)
-  local max_content_len = util.get_max_content_length(content)
   local max_height = math.floor(vim.o.lines * config.hover.max_height)
 
   local float_option = {
-    width = math.min(max_float_width, max_content_len),
+    width = ideal_width,
     zindex = 80,
   }
 
