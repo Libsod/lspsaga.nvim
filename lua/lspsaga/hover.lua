@@ -7,6 +7,7 @@ local islist = util.is_ten and vim.islist or vim.tbl_islist
 local hover = {}
 
 function hover:clean()
+  -- print("--- ENTERING hover:clean ---")
   if self.cancel then
     self.cancel()
     self.cancel = nil
@@ -222,6 +223,8 @@ local function ignore_error(args, can_through)
 end
 
 function hover:do_request(args)
+  -- print("--- ENTERING do_request ---")
+  -- print("self.bufnr at start of do_request:", vim.inspect(self.bufnr))
   local method = 'textDocument/hover'
   local clients = util.get_client_by_method(method)
   if #clients == 0 then
@@ -232,6 +235,7 @@ function hover:do_request(args)
 
   local params = lsp.util.make_position_params(0, util.get_offset_encoding({ client = clients[1] }))
   _, self.cancel = lsp.buf_request(0, method, params, function(_, result, ctx, _)
+    -- print("--- LSP Callback Entered ---")
     count = count + 1
 
     if api.nvim_get_current_buf() ~= ctx.bufnr then
@@ -279,6 +283,8 @@ function hover:do_request(args)
       return
     end
     local content = vim.split(value, '\n', { trimempty = true })
+    -- print('--- LSPSAGA RAW CONTENT ---')
+    -- print(vim.inspect(content))
     local client = vim.lsp.get_client_by_id(ctx.client_id)
     if not client then
       return
@@ -293,6 +299,7 @@ function hover:do_request(args)
       and self.winid
       and api.nvim_win_is_valid(self.winid)
     then
+      -- print("--- TAKING UPDATE PATH in do_request ---")
       vim.bo[self.bufnr].modifiable = true
       local win_conf = api.nvim_win_get_config(self.winid)
       local max_len = util.get_max_content_length(content)

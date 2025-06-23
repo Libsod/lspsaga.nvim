@@ -4,7 +4,7 @@ local ui = require('lspsaga').config.ui
 local win = {}
 
 local function make_floating_popup_options(opts)
-  -- print('--- window.lua: make_floating_popup_options ENTER ---') -- <<< ДОБАВИТЬ
+  -- print('--- window.lua: make_floating_popup_options ENTER ---')
   -- print('Input opts:', vim.inspect(opts))
   vim.validate({
     opts = { opts, 't', true },
@@ -51,10 +51,10 @@ local function make_floating_popup_options(opts)
     title_pos = opts.title_pos or 'center'
   end
 
-  -- print('--- window.lua: make_floating_popup_options EXIT ---') -- <<< ДОБАВИТЬ
-  -- print('Calculated anchor:', vim.inspect(anchor)) -- <<< ДОБАВИТЬ
-  -- print('Calculated row, col:', vim.inspect(row), vim.inspect(col)) -- <<< ДОБАВИТЬ
-  -- print('Final height, width to be returned:', vim.inspect(opts.height), vim.inspect(opts.width)) -- <<< ДОБАВИТЬ
+  -- print('--- window.lua: make_floating_popup_options EXIT ---')
+  -- print('Calculated anchor:', vim.inspect(anchor))
+  -- print('Calculated row, col:', vim.inspect(row), vim.inspect(col))
+  -- print('Final height, width to be returned:', vim.inspect(opts.height), vim.inspect(opts.width))
 
   return {
     anchor = anchor,
@@ -126,7 +126,7 @@ function obj:setlines(lines, row, erow)
     return line:gsub('[\n\r]+', '')
   end, lines)
   if self.bufnr and api.nvim_buf_is_valid(self.bufnr) then
-    -- print('--- window.lua: Forcing buffer clear for bufnr:', self.bufnr) -- Отладочный print
+    -- print('--- window.lua: Forcing buffer clear for bufnr:', self.bufnr)
     api.nvim_buf_set_lines(self.bufnr, 0, -1, false, {})
   end
   api.nvim_buf_set_lines(self.bufnr, row, erow, false, lines)

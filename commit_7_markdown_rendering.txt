@@ -1,0 +1,46 @@
+Для коммита 7 (feat(hover): improve markdown rendering with proper concealing):
+
+1. Заменить:
+  self.bufnr, self.winid = win
+    :new_float(float_option, false, option_fn and true or false)
+    :setlines(new)
+    :bufopt({
+
+на:
+  -- *** ИЗМЕНЕНИЕ: Мы больше НЕ фильтруем ``` из финального контента ***
+  local new_content_for_display = vim.deepcopy(content)
+
+  if option_fn then
+    float_option = vim.tbl_extend('keep', float_option, option_fn(float_option.width))
+  end
+
+  local curbuf_for_autocmds = api.nvim_get_current_buf()
+
+  self.bufnr, self.winid = win
+    :new_float(float_option, false, option_fn and true or false)
+    :setlines(new_content_for_display) -- Передаем ПОЛНЫЙ контент с ```
+    :bufopt({
+
+2. Заменить:
+    :winopt({
+      ['conceallevel'] = 2,
+      ['concealcursor'] = 'niv',
+      ['showbreak'] = 'NONE',
+      ['wrap'] = true,
+    })
+
+на:
+    :winopt({
+      -- *** ИЗМЕНЕНИЕ: Включаем conceal, чтобы скрыть ``` ***
+      ['conceallevel'] = 2, -- 2 или 3 для активного скрытия
+      ['concealcursor'] = 'n', -- Скрывать и под курсором в нормальном режиме
+      ['showbreak'] = 'NONE',
+      ['wrap'] = true,
+    })
+
+3. Заменить:
+  vim.treesitter.start(self.bufnr, 'markdown')
+
+на:
+  -- *** ИЗМЕНЕНИЕ: Безопасно активируем Tree-sitter для финального окна ***
+  pcall(vim.treesitter.start, self.bufnr, 'markdown')
