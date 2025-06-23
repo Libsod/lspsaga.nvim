@@ -118,13 +118,117 @@ function hover:open_floating_preview(content, option_fn)
     ideal_width = 10
   end
 
-  local new = {}
-  local max_height = math.floor(vim.o.lines * config.hover.max_height)
+  -- 3. ЭТАП 1 ВЫСОТЫ: Получаем "семантически видимые" строки
+  -- Важно: здесь мы все еще фильтруем ```, чтобы ПРАВИЛЬНО РАССЧИТАТЬ ВЫСОТУ.
+  -- Но для финального отображения мы их оставим.
+  local semantically_visible_lines = {}
+  local last_added_line_was_empty = false
+  for i, line in ipairs(content_for_calc) do
+    local skip_processing = false
+    if string.match(line, '^%s*```') then
+      skip_processing = true
+    else
+      local is_empty_line = string.match(line, '^%s*$')
+      if is_empty_line then
+        local prev_is_fence = (
+          content_for_calc[i - 1] and string.match(content_for_calc[i - 1], '^%s*```')
+        )
+        local next_is_fence = (
+          content_for_calc[i + 1] and string.match(content_for_calc[i + 1], '^%s*```')
+        )
+        if prev_is_fence and next_is_fence then
+          skip_processing = true
+        elseif last_added_line_was_empty then
+          skip_processing = true
+        end
+      end
+    end
+    if not skip_processing then
+      table.insert(semantically_visible_lines, line)
+      last_added_line_was_empty = string.match(line, '^%s*$')
+    end
+  end
+  while
+    #semantically_visible_lines > 0
+    and string.match(semantically_visible_lines[#semantically_visible_lines], '^%s*$')
+  do
+    table.remove(semantically_visible_lines)
+  end
 
+  -- 4. ЭТАП 2 ВЫСОТЫ: "Предварительный рендеринг" для `semantically_visible_lines`
+  local ideal_height_from_prerender = 0
+  local scratch_bufnr_prerender = nil
+  local temp_winid_prerender = nil
+  local pr_success, pr_result_or_err = pcall(function()
+    if #semantically_visible_lines == 0 then
+      ideal_height_from_prerender = 0
+      return
+    end
+    scratch_bufnr_prerender = api.nvim_create_buf(false, true)
+    if not scratch_bufnr_prerender or not api.nvim_buf_is_valid(scratch_bufnr_prerender) then
+      error('Pre-render: Failed to create scratch buffer')
+    end
+    api.nvim_buf_set_option(scratch_bufnr_prerender, 'filetype', 'markdown')
+    api.nvim_buf_set_option(scratch_bufnr_prerender, 'wrap', true)
+    api.nvim_buf_set_option(scratch_bufnr_prerender, 'modifiable', true)
+    api.nvim_buf_set_lines(scratch_bufnr_prerender, 0, -1, false, semantically_visible_lines)
+    api.nvim_buf_set_option(scratch_bufnr_prerender, 'modifiable', false)
+    local temp_win_opts_prerender = {
+      relative = 'editor',
+      width = ideal_width,
+      height = vim.o.lines,
+      row = vim.o.lines + 10,
+      col = vim.o.columns + 10,
+      focusable = false,
+      style = 'minimal',
+      noautocmd = true,
+    }
+    temp_winid_prerender =
+      api.nvim_open_win(scratch_bufnr_prerender, false, temp_win_opts_prerender)
+    if not temp_winid_prerender or not api.nvim_win_is_valid(temp_winid_prerender) then
+      error('Pre-render: Failed to create temporary window')
+    end
+    local line_count_in_prerender_buf = api.nvim_buf_line_count(scratch_bufnr_prerender)
+    if line_count_in_prerender_buf == 0 then
+      ideal_height_from_prerender = 0
+    else
+      api.nvim_win_set_cursor(temp_winid_prerender, { line_count_in_prerender_buf, 0 })
+      ideal_height_from_prerender = api.nvim_win_get_cursor(temp_winid_prerender)[1]
+    end
+  end)
+  if temp_winid_prerender and api.nvim_win_is_valid(temp_winid_prerender) then
+    api.nvim_win_close(temp_winid_prerender, true)
+  end
+  if scratch_bufnr_prerender and api.nvim_buf_is_valid(scratch_bufnr_prerender) then
+    api.nvim_buf_delete(scratch_bufnr_prerender, { force = true })
+  end
+  if not pr_success then
+    print('Error during pre-render height calculation:', pr_result_or_err)
+    ideal_height_from_prerender = #semantically_visible_lines
+  end
+
+  -- 5. Финальная высота
+  local ideal_height = ideal_height_from_prerender
+  local final_height_adjustment = 0 -- Оставляем для тонкой подстройки, если понадобится
+  ideal_height = ideal_height + final_height_adjustment
+  if ideal_height <= 0 then
+    if #content_for_calc > 0 then
+      ideal_height = 1
+    else
+      return
+    end
+  end
+
+  -- --- Финальные опции окна ---
+  local conf_max_height_factor = config.hover.max_height or 0.6
+  local max_height_from_config = math.floor(vim.o.lines * conf_max_height_factor)
   local float_option = {
-    width = ideal_width,
+    width = math.min(max_allowed_width_config, ideal_width),
+    height = math.min(max_height_from_config, ideal_height),
     zindex = 80,
   }
+
+  local new = {}
 
   local in_codeblock = false
 
@@ -177,8 +281,6 @@ function hover:open_floating_preview(content, option_fn)
     end
   end
 
-  local increase = util.win_height_increase(new, config.hover.max_width)
-  float_option.height = math.min(max_height, #new + increase)
 
   if option_fn then
     float_option = vim.tbl_extend('keep', float_option, option_fn(float_option.width))
