@@ -356,7 +356,7 @@ function hover:open_floating_preview(content, option_fn)
           api.nvim_win_close(self.winid, true)
         end
         self:clean()
-        api.nvim_del_autocmd(opt.id)
+        pcall(api.nvim_del_autocmd, opt.id)
       end,
       desc = '[Lspsaga] Auto close hover window',
     })
